@@ -1,58 +1,38 @@
-const { ApolloServer, gql } = require('apollo-server');
+import { ApolloServer } from 'apollo-server-express'
+import express from 'express'
+import mongoose from 'mongoose';
+import { typeDefs, resolvers } from './schema'
+import { APP_PORT, IN_PROD } from './config'
 
-const db = {
-    socials : [
-        { id : '1', associations : ['some value', 'some more value'], selfEvaluation: 'value1', productServices : 'value2', competitor : 'value3', partnerships : 'value4'},
-        { id : '2', associations : ['value', 'more value'], selfEvaluation: 'value1', productServices : 'value2', competitor : 'value3', partnerships : 'value4'},
-        { id : '3', associations : ['some value1', 'some more value1'], selfEvaluation: 'value1', productServices : 'value2', competitor : 'value3', partnerships : 'value4'},
-    ]
-}
 
-const typeDefs = gql`
-    type Query {
-        getAllSocialData : [Social!]!
-        getSocialData(id : ID!) : Social
+const DB_USER = 'xxxxxxx';
+const DB_PASS = 'XXXXXXX';
+const DB_HOST = 'xxxxxxxxxxxxxxxxxx';
+const DB_NAME = 'xxxxxxx';
+
+// If mongoDB connects only then spin up the server otherwise throw an error
+(async () => {
+    try{
+        await mongoose.connect(
+            `mongodb+srv://${DB_USER}:${DB_PASS}@${DB_HOST}/${DB_NAME}?retryWrites=true&w=majority`, { useNewUrlParser : true }
+        )
+        
+        const app = express();
+        app.disable('x-powered-by');
+
+        const server = new ApolloServer({
+            typeDefs,
+            resolvers,
+            playground : !IN_PROD
+        });
+
+        server.applyMiddleware({ app }); // app is from an existing express app
+
+        app.listen({ port: APP_PORT }, () =>
+        console.log(`🚀 Server ready at http://localhost:${APP_PORT}${server.graphqlPath}`)
+        )
+    } catch(e) {
+        console.log(e);
     }
-    type Social {
-        id : ID!
-        associations : [String!]!
-        selfEvaluation : String
-        productServices : String
-        competitor : String
-        partnerships : String
-    }
-    type Mutation {
-        addSocialData(id : ID!, associations : [String!]!, selfEvaluation : String, productServices : String, competitor : String, partnerships : String) : Social
-    }
-`;
+})();
 
-const resolvers = {
-    Query : {
-        getAllSocialData : () => db.socials,
-        getSocialData : (parent, { id }) => db.socials.find(el => el.id === id)
-    },
-    Mutation : {
-        addSocialData : (parent, args) => {
-            const data = {
-                id : args.id,
-                associations : args.associations,
-                selfEvaluation : args.selfEvaluation,
-                productServices : args.productServices,
-                competitor : args.competitor,
-                partnerships : args.partnerships
-            }
-            db.socials.push(data);
-            return data;
-        }
-    }
-};
-
-// spinning up a server
-const server = new ApolloServer({
-    typeDefs,
-    resolvers
-});
-
-server.listen()
-    .then(({ url }) => console.log(url))
-    .catch(ex => console.log(ex));
